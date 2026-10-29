@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b7a75">
+<title>제주 주유 최저가 도우미</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--brand:#0b7a75;--soft:#e3f3f2;--bg:#f6f8f8;--card:#fff;--text:#182226;--muted:#667378;--line:#dbe3e4;--danger:#c43d3d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendard','Noto Sans KR','Malgun Gothic',sans-serif;line-height:1.45}
+.app{max-width:760px;margin:0 auto;padding-bottom:40px}
+header{position:sticky;top:0;z-index:1200;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--brand);color:#fff}
+header h1{font-size:18px;margin:0}
+header nav button{background:none;border:0;color:#d7efed;font-size:15px;font-weight:600;margin-left:12px;padding:6px 2px;cursor:pointer}
+header nav button.on{color:#fff;border-bottom:2px solid #fff}
+main{padding:0 12px}
+.muted{color:var(--muted)}.small{font-size:13px}.error{color:var(--danger)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin:12px 0;display:grid;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.row>label{flex:1 1 100px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+select,input[type=number]{font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);min-height:42px;width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:14px;min-height:40px;cursor:pointer}
+.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-size:15px;min-height:44px;cursor:pointer;color:var(--text)}
+.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.danger{color:var(--danger)}
+.check{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text);font-size:14px}
+.check input[type=checkbox]{width:20px;height:20px}
+.check input[type=number]{width:96px;min-height:36px;padding:4px 8px}
+#map{height:320px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px}
+#map.pick{outline:3px solid var(--brand);cursor:crosshair}
+.pm{background:#fff;border:2px solid var(--brand);color:var(--brand);border-radius:8px;font-weight:700;font-size:12px;text-align:center;line-height:22px;height:26px;width:58px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.pm.best{background:var(--brand);color:#fff}.pm.sel{border-color:#e8590c;transform:scale(1.15)}
+.pin{font-size:24px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.explain{background:var(--soft);border-radius:10px;padding:10px 12px;margin:8px 0}
+ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}.st.open{border-color:var(--brand)}
+.st-main{display:flex;gap:10px;align-items:center;padding:12px;cursor:pointer}
+.rank{flex:none;width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
+.info{flex:1;min-width:0;display:grid;gap:2px}.info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;margin-right:4px}
+.b-self{background:#fff1d6;color:#8a5a00}.b-alt{background:#e0efff;color:#1c5aa6}
+.nums{text-align:right;display:grid}.price{font-size:18px;font-weight:800}.price small{font-size:11px;font-weight:500}
+.total{font-size:13px;font-weight:700;color:var(--brand)}
+.detail{padding:0 12px 12px;border-top:1px dashed var(--line)}.detail p{margin:8px 0}
+.chart svg{width:100%;height:80px;background:var(--bg);border-radius:8px}
+.legend{display:flex;justify-content:space-between}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}.card.off{opacity:.6}
+.card p{margin:4px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions .btn{flex:1 1 auto}
+.back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px;display:grid;gap:10px}
+.modal h2{margin:4px 0}
+.hidden{display:none!important}
+@media(min-width:700px){.back{align-items:center}.modal{border-radius:16px}#map{height:400px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><h1>⛽ 제주 주유 도우미</h1>
+<nav><button id="tab-home" class="on">주유소</button><button id="tab-alerts">🔔 알림</button></nav></header>
+<main>
+<section id="home">
+  <div class="panel">
+    <div class="chips" id="zones"></div>
+    <div class="row">
+      <label>유종<select id="fuel"></select></label>
+      <label>반경<select id="radius"></select></label>
+      <label>주유량(L)<input id="liters" type="number" min="5" max="100" value="30"></label>
+    </div>
+    <div class="row">
+      <label>시간 가치(원/시간)<input id="tv" type="number" min="0" step="1000" value="10000"></label>
+      <label>반납 장소<select id="dest"></select></label>
+    </div>
+    <div class="chips">
+      <button class="chip" id="btn-geo">📍 내 위치 사용</button>
+      <button class="chip" id="btn-pick">🗺 지도에서 기준 위치</button>
+      <button class="chip" id="btn-pickdest">🏁 지도에서 반납 장소</button>
+    </div>
+    <label class="check hidden" id="near-wrap"><input type="checkbox" id="near"> 반납 장소 3km 이내 주유소 우선</label>
+    <label class="check"><input type="checkbox" id="selfonly"> 셀프 주유소만</label>
+    <p class="small error" id="geo-err"></p>
+  </div>
+  <div id="map"></div>
+  <div id="notices"></div>
+  <div id="explain"></div>
+  <ol id="list"></ol>
+  <p class="small muted" id="foot"></p>
+</section>
+
+<section id="alerts" class="hidden">
+  <h2>내 알림</h2>
+  <p class="small muted">이 버전은 서버가 없어 <b>페이지를 열어 둔 동안</b>만 1분마다 가격을 확인합니다. 알림 설정은 이 브라우저에 저장됩니다.</p>
+  <div id="alert-msg" class="small"></div>
+  <div id="alert-list"></div>
+</section>
+</main>
+</div>
+
+<div class="back hidden" id="modal-back"><div class="modal" id="modal"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+/* ============ 데이터 (샘플: 실제 주유소/가격이 아닙니다) ============ */
+const FUELS={B027:"휘발유",D047:"경유",B034:"고급휘발유",K015:"LPG"};
+const BASE={B027:1650,D047:1490,B034:1890,K015:1010};
+const ZONES=[["제주공항",33.5113,126.493],["제주시",33.4996,126.5312],["서귀포",33.2541,126.5601],["성산",33.458,126.9425],["애월",33.4636,126.3311]];
+// id,상호,브랜드,주소,lat,lng,셀프,알뜰,오프셋,위상
+const S=[
+["M01","공항로셀프주유소","자영알뜰","제주시 공항로 2",33.5072,126.4985,1,1,-35,0],
+["M02","용담주유소","SK에너지","제주시 용담이동 1500",33.512,126.509,0,0,25,.8],
+["M03","도두알뜰주유소","농협알뜰","제주시 도두일동 800",33.5152,126.469,1,1,-28,1.6],
+["M04","연동GS주유소","GS칼텍스","제주시 연동 270",33.488,126.493,0,0,18,2.2],
+["M05","노형셀프주유소","S-OIL","제주시 노형동 920",33.485,126.478,1,0,-10,2.9],
+["M06","제주시청주유소","현대오일뱅크","제주시 이도이동 1700",33.4996,126.5312,0,0,30,3.5],
+["M07","아라셀프주유소","자영알뜰","제주시 아라일동 100",33.47,126.544,1,1,-42,4.1],
+["M08","삼화주유소","SK에너지","제주시 삼양일동 55",33.524,126.587,0,0,22,4.8],
+["M09","애월셀프주유소","자영알뜰","제주시 애월읍 애월로 10",33.4636,126.3311,1,1,-30,5.4],
+["M10","한담주유소","GS칼텍스","제주시 애월읍 한담로 3",33.465,126.31,0,0,35,.4],
+["M11","곽지알뜰주유소","농협알뜰","제주시 애월읍 곽지리 400",33.448,126.3,1,1,-20,1.1],
+["M12","한림주유소","S-OIL","제주시 한림읍 한림로 20",33.413,126.265,0,0,15,1.9],
+["M13","서귀포셀프주유소","자영알뜰","서귀포시 중정로 80",33.25,126.56,1,1,-38,2.7],
+["M14","서귀포중앙주유소","SK에너지","서귀포시 중앙로 40",33.2541,126.5601,0,0,28,3.3],
+["M15","중문주유소","현대오일뱅크","서귀포시 중문관광로 60",33.25,126.412,0,0,32,4],
+["M16","대정셀프주유소","농협알뜰","서귀포시 대정읍 일주서로 10",33.22,126.25,1,1,-25,4.6],
+["M17","성산주유소","GS칼텍스","서귀포시 성산읍 일출로 100",33.458,126.9425,0,0,38,5.2],
+["M18","성산알뜰주유소","자영알뜰","서귀포시 성산읍 성산리 300",33.44,126.925,1,1,-18,.2],
+["M19","표선셀프주유소","S-OIL","서귀포시 표선면 표선리 20",33.326,126.835,1,0,-5,1.4],
+["M20","조천주유소","SK에너지","제주시 조천읍 신북로 700",33.54,126.64,0,0,20,2.4]
+].map(a=>({id:a[0],name:a[1],brand:a[2],addr:a[3],lat:a[4],lng:a[5],self:!!a[6],alt:!!a[7],off:a[8],ph:a[9]}));
+
+function priceAt(s,fuel,ms){
+  const b=Math.floor(ms/600000);
+  return Math.round(BASE[fuel]+s.off+Math.sin(b/36*2*Math.PI+s.ph)*25+Math.sin(b/600*2*Math.PI+s.ph)*15);
+}
+function history(s,fuel,days){const out=[],now=Date.now();for(let t=now-days*864e5;t<=now;t+=3*36e5)out.push([t,priceAt(s,fuel,t)]);return out}
+
+/* ============ 계산 ============ */
+const km=(a,b)=>{const r=6371.0088,q=Math.PI/180,dl=(b[0]-a[0])*q,dg=(b[1]-a[1])*q;
+  const h=Math.sin(dl/2)**2+Math.cos(a[0]*q)*Math.cos(b[0]*q)*Math.sin(dg/2)**2;return 2*r*Math.asin(Math.sqrt(h))};
+// 직선거리 x1.35 도로계수, 평균 40km/h (서버 없는 버전이라 길찾기 API 대신 추정)
+const travel=(a,b)=>{const d=km(a,b)*1.35;return{min:d/40*60,km:d}};
+const won=n=>Math.round(n).toLocaleString("ko-KR")+"원";
+function totalCost(price,L,xMin,xKm,tv,eff=10){
+  const fuel=Math.round(price*L),time=Math.round(xMin/60*tv),trav=Math.round(xKm/eff*price);
+  return{fuel,time,trav,total:fuel+time+trav};
+}
+function recommend(o){
+  const {origin,dest,fuel,radiusKm,L,tv,near,selfOnly}=o,now=Date.now(),notices=[];
+  let list=S.map(s=>({...s,price:priceAt(s,fuel,now),dist:km(origin,[s.lat,s.lng])}))
+    .filter(s=>s.dist<=radiusKm&&(!selfOnly||s.self));
+  const found=list.length;
+  if(dest&&near){const n=list.filter(s=>km(dest,[s.lat,s.lng])<=3);
+    if(n.length)list=n;else if(list.length)notices.push("반납 장소 3km 이내 주유소가 없어 전체 주유소에서 추천합니다.")}
+  const base=dest?travel(origin,dest):null;
+  const rows=list.map(s=>{
+    const a=travel(origin,[s.lat,s.lng]);let xm,xk;
+    if(dest){const b=travel([s.lat,s.lng],dest);xm=Math.max(0,a.min+b.min-base.min);xk=Math.max(0,a.km+b.km-base.km)}
+    else{xm=a.min*2;xk=a.km*2}
+    return{...s,xm,xk,c:totalCost(s.price,L,xm,xk,tv)};
+  });
+  const byPrice=[...rows].sort((a,b)=>a.price-b.price||a.xm-b.xm);
+  byPrice.forEach((r,i)=>r.pr=i+1);
+  rows.sort((a,b)=>a.c.total-b.c.total||a.price-b.price);
+  rows.forEach((r,i)=>r.rank=i+1);
+  const cheap=byPrice[0],best=rows[0];let explain="";
+  if(best&&cheap&&best.id!==cheap.id){
+    explain=`리터당 최저가는 ${cheap.name}(${cheap.price.toLocaleString()}원)이지만, 이동 시간이 약 ${Math.max(0,Math.round(cheap.xm-best.xm))}분 더 걸려 실질 총비용은 ${best.name}(${best.price.toLocaleString()}원, 리터당 +${best.price-cheap.price}원)이 약 ${won(cheap.c.total-best.c.total)} 더 저렴합니다.`}
+  return{top:rows.slice(0,5),all:rows,explain,notices,found};
+}
+
+/* ============ 상태 / UI ============ */
+const $=id=>document.getElementById(id);
+const st={center:{lat:ZONES[0][1],lng:ZONES[0][2],label:ZONES[0][0]},dest:null,pick:null,sel:null,res:null};
+const RADII=[1,3,5,10];
+$("fuel").innerHTML=Object.entries(FUELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
+$("radius").innerHTML=RADII.map(r=>`<option value="${r}" ${r===3?"selected":""}>${r}km</option>`).join("");
+$("dest").innerHTML='<option value="">지정 안 함</option>'+ZONES.map((z,i)=>`<option value="${i}">${z[0]}</option>`).join("");
+$("zones").innerHTML=ZONES.map((z,i)=>`<button class="chip" data-z="${i}">${z[0]}</button>`).join("");
+
+const map=L.map("map").setView([st.center.lat,st.center.lng],12);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+const layer=L.layerGroup().addTo(map);
+let circle=null;
+const pinIcon=e=>L.divIcon({className:"",html:`<div class="pin">${e}</div>`,iconSize:[30,30],iconAnchor:[15,28]});
+map.on("click",e=>{
+  if(!st.pick)return;
+  const p={lat:+e.latlng.lat.toFixed(5),lng:+e.latlng.lng.toFixed(5),label:"지도에서 선택"};
+  if(st.pick==="dest"){st.dest=p;$("dest").value=""}else st.center=p;
+  setPick(null);refresh(true);
+});
+function setPick(m){st.pick=m;$("map").classList.toggle("pick",!!m);
+  $("btn-pick").classList.toggle("on",m==="center");$("btn-pickdest").classList.toggle("on",m==="dest")}
+
+function inputs(){return{origin:[st.center.lat,st.center.lng],dest:st.dest?[st.dest.lat,st.dest.lng]:null,
+  fuel:$("fuel").value,radiusKm:+$("radius").value,L:Math.max(1,+$("liters").value||30),tv:Math.max(0,+$("tv").value||0),
+  near:$("near").checked,selfOnly:$("selfonly").checked}}
+
+function refresh(fly){
+  const o=inputs();st.res=recommend(o);const r=st.res;
+  $("near-wrap").classList.toggle("hidden",!st.dest);
+  document.querySelectorAll("#zones .chip").forEach(b=>b.classList.toggle("on",ZONES[b.dataset.z][0]===st.center.label));
+  layer.clearLayers();if(circle)map.removeLayer(circle);
+  circle=L.circle([st.center.lat,st.center.lng],{radius:o.radiusKm*1000,color:"#0b7a75",weight:1,fillOpacity:.05}).addTo(map);
+  L.marker([st.center.lat,st.center.lng],{icon:pinIcon("📍"),interactive:false}).addTo(layer);
+  if(st.dest)L.marker([st.dest.lat,st.dest.lng],{icon:pinIcon("🏁"),interactive:false}).addTo(layer);
+  const bestId=r.top[0]&&r.top[0].id;
+  r.all.forEach(s=>{
+    const cls="pm"+(s.id===bestId?" best":"")+(s.id===st.sel?" sel":"");
+    L.marker([s.lat,s.lng],{icon:L.divIcon({className:"",html:`<div class="${cls}">${s.price.toLocaleString()}</div>`,iconSize:[58,26],iconAnchor:[29,26]}),
+      zIndexOffset:s.id===st.sel?1000:s.id===bestId?500:0}).on("click",()=>{st.sel=s.id;refresh()}).addTo(layer);
+  });
+  if(fly)map.flyTo([st.center.lat,st.center.lng],map.getZoom(),{duration:.6});
+  $("notices").innerHTML=r.notices.map(n=>`<p class="small" style="color:#b7791f">ℹ️ ${n}</p>`).join("")
+    +(r.found?"":'<p class="muted">반경 내 주유소가 없습니다. 반경을 넓혀 보세요.</p>');
+  $("explain").innerHTML=r.explain?`<div class="explain">💡 ${r.explain}</div>`:"";
+  $("list").innerHTML=r.top.map(s=>{
+    const open=s.id===st.sel;
+    return `<li class="st ${open?"open":""}"><div class="st-main" data-id="${s.id}">
+      <span class="rank">${s.rank}</span>
+      <span class="info"><strong>${s.name}</strong><span>${s.self?'<span class="badge b-self">셀프</span>':""}${s.alt?'<span class="badge b-alt">알뜰</span>':""}<span class="muted small">${s.brand}${s.pr!==s.rank?` · 가격순 ${s.pr}위`:""}</span></span></span>
+      <span class="nums"><span class="price">${s.price.toLocaleString()}<small>원/L</small></span>
+      <span class="muted small">${st.dest?"우회":"왕복"} ${Math.round(s.xm)}분(추정)</span><span class="total">총 ${won(s.c.total)}</span></span></div>
+      ${open?`<div class="detail"><p class="small">${s.addr}</p>
+      <p class="small muted">주유 ${won(s.c.fuel)} + 시간 ${won(s.c.time)} + 이동연료 ${won(s.c.trav)}</p>
+      ${chart(s,o.fuel)}<button class="btn primary" data-alert="${s.id}" style="width:100%">🔔 이 가격에 알림</button></div>`:""}</li>`}).join("");
+  $("foot").textContent=`반경 내 ${r.found}곳 · 샘플 데이터(실제 가격 아님) · 이동 시간은 직선거리 기반 추정`;
+}
+function chart(s,fuel){
+  const h=history(s,fuel,7),W=300,H=80,p=6,t0=h[0][0],t1=h[h.length-1][0],ps=h.map(x=>x[1]),lo=Math.min(...ps),hi=Math.max(...ps);
+  const X=t=>p+(t-t0)/(t1-t0)*(W-2*p),Y=v=>H-p-(v-lo)/Math.max(hi-lo,1)*(H-2*p);
+  const d=h.map((x,i)=>`${i?"L":"M"}${X(x[0]).toFixed(1)},${Y(x[1]).toFixed(1)}`).join(" ");
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 7일 가격 추이"><path d="${d}" fill="none" stroke="#0b7a75" stroke-width="2"/><circle cx="${X(t1)}" cy="${Y(ps[ps.length-1])}" r="3.5" fill="#0b7a75"/></svg>
+  <div class="legend small muted"><span>7일 최저 ${lo.toLocaleString()}원</span><span>현재 ${ps[ps.length-1].toLocaleString()}원</span><span>최고 ${hi.toLocaleString()}원</span></div></div>`;
+}
+
+$("zones").onclick=e=>{const i=e.target.dataset.z;if(i==null)return;const z=ZONES[i];st.center={lat:z[1],lng:z[2],label:z[0]};refresh(true)};
+$("dest").onchange=e=>{const v=e.target.value;st.dest=v===""?null:{lat:ZONES[v][1],lng:ZONES[v][2],label:ZONES[v][0]};refresh()};
+["fuel","radius","liters","tv","near","selfonly"].forEach(id=>$(id).addEventListener("change",()=>refresh()));
+$("btn-pick").onclick=()=>setPick(st.pick==="center"?null:"center");
+$("btn-pickdest").onclick=()=>setPick(st.pick==="dest"?null:"dest");
+$("btn-geo").onclick=()=>{
+  $("geo-err").textContent="";
+  if(!navigator.geolocation){$("geo-err").textContent="이 브라우저는 위치 기능을 지원하지 않습니다.";return}
+  navigator.geolocation.getCurrentPosition(p=>{
+    const lat=p.coords.latitude,lng=p.coords.longitude;
+    if(lat<32.5||lat>34.2||lng<125.8||lng>127.2){$("geo-err").textContent="현재 위치가 제주 밖입니다. 권역 버튼을 사용해 주세요.";return}
+    st.center={lat,lng,label:"내 위치"};refresh(true)},
+  e=>{$("geo-err").textContent=e.code===1?"위치 권한이 거부되었습니다. 브라우저 설정에서 허용하거나 권역 버튼을 사용해 주세요.":"현재 위치를 확인할 수 없습니다."},
+  {timeout:10000,maximumAge:60000});
+};
+$("list").onclick=e=>{
+  const a=e.target.closest("[data-alert]");if(a){openAlertModal(a.dataset.alert);return}
+  const m=e.target.closest("[data-id]");if(m){st.sel=st.sel===m.dataset.id?null:m.dataset.id;refresh()}
+};
+
+/* ============ 알림 (localStorage, 페이지가 열려 있을 때만 동작) ============ */
+const KEY="jejupetrol-alerts-v1";
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch{return[]}};
+const save=a=>{try{localStorage.setItem(KEY,JSON.stringify(a))}catch{}};
+const COOL=6*36e5;
+
+function openAlertModal(stationId){
+  const s=S.find(x=>x.id===stationId),o=inputs(),cur=priceAt(s,o.fuel,Date.now());
+  $("modal").innerHTML=`<h2>🔔 ${s.name}</h2>
+  <p class="small muted">현재 ${cur.toLocaleString()}원/L · 목표가 이하가 되면 알려드려요. (이 주유소 기준)</p>
+  <label>목표가 (원/L 이하)<input id="m-price" type="number" value="${cur-20}"></label>
+  <p class="small muted">제안: 현재가보다 -20원</p>
+  <label>대여 종료일 (선택 · 지나면 자동 삭제)<input id="m-end" type="date" style="font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px"></label>
+  <p class="small muted">푸시 서버가 없어, 페이지가 열려 있을 때 브라우저 알림(권한 허용 시)과 화면 안내로 알려드립니다. 아래 버튼을 누를 때 알림 권한을 요청합니다.</p>
+  <p id="m-err" class="small error"></p>
+  <div class="actions"><button class="btn" id="m-cancel">취소</button><button class="btn primary" id="m-ok">🔔 알림 등록</button></div>`;
+  $("modal-back").classList.remove("hidden");
+  $("m-cancel").onclick=closeModal;
+  $("m-ok").onclick=async()=>{
+    const price=+$("m-price").value;
+    if(!(price>0)){$("m-err").textContent="목표가(원/L)를 입력해 주세요.";return}
+    const end=$("m-end").value||null;
+    let msg="";
+    if("Notification" in window){
+      if(Notification.permission==="denied")msg="브라우저 알림이 차단되어 화면 안내로만 알려드립니다. (설정에서 허용 가능)";
+      else if(Notification.permission==="default"){const p=await Notification.requestPermission();if(p!=="granted")msg="알림 권한이 허용되지 않아 화면 안내로만 알려드립니다."}
+    }else msg="이 브라우저는 알림을 지원하지 않아 화면 안내로만 알려드립니다.";
+    const a=load();
+    a.push({id:Date.now(),stationId:s.id,name:s.name,fuel:o.fuel,target:price,end,on:true,last:0,sent:[]});
+    save(a);closeModal();showTab("alerts");
+    $("alert-msg").textContent=msg||"알림이 등록되었습니다.";
+  };
+}
+function closeModal(){$("modal-back").classList.add("hidden")}
+$("modal-back").onclick=e=>{if(e.target.id==="modal-back")closeModal()};
+
+function pruneExpired(){
+  const today=new Date(Date.now()+9*36e5).toISOString().slice(0,10),a=load(),k=a.filter(x=>!x.end||x.end>=today);
+  if(k.length!==a.length)save(k);
+}
+function renderAlerts(){
+  pruneExpired();const a=load();
+  $("alert-list").innerHTML=a.length?a.map(x=>{const s=S.find(v=>v.id===x.stationId),cur=priceAt(s,x.fuel,Date.now());
+    return `<div class="card ${x.on?"":"off"}"><strong>${x.name} · ${FUELS[x.fuel]}</strong>
+    <p class="small">목표가 ${x.target.toLocaleString()}원/L 이하 · 현재 ${cur.toLocaleString()}원</p>
+    ${x.end?`<p class="small muted">대여 종료일 ${x.end} (이후 자동 삭제)</p>`:""}
+    ${x.sent.length?`<p class="small muted">최근 알림: ${x.sent.slice(-3).reverse().join("<br>")}</p>`:""}
+    <div class="actions"><button class="btn" data-t="${x.id}">${x.on?"끄기":"켜기"}</button><button class="btn" data-test="${x.id}">테스트</button><button class="btn danger" data-d="${x.id}">삭제</button></div></div>`}).join("")
+    :'<p class="muted">등록된 알림이 없습니다. 주유소를 눌러 “🔔 이 가격에 알림”을 사용해 보세요.</p>';
+}
+function notify(text){
+  if("Notification" in window&&Notification.permission==="granted"){try{new Notification("제주 주유 알림",{body:text})}catch{}}
+  $("alert-msg").textContent=text;
+}
+$("alert-list").onclick=e=>{
+  const t=e.target.dataset,a=load();
+  if(t.t)a.forEach(x=>{if(x.id==+t.t)x.on=!x.on});
+  else if(t.d){if(!confirm("이 알림을 삭제할까요?"))return;save(a.filter(x=>x.id!=+t.d));renderAlerts();return}
+  else if(t.test){const x=a.find(v=>v.id==+t.test);notify(`[제주 주유 알림] 테스트 알림입니다 · ${x.name} ${FUELS[x.fuel]} 알림이 정상 동작 중입니다.`);return}
+  else return;
+  save(a);renderAlerts();
+};
+function checkAlerts(){
+  pruneExpired();const a=load(),now=Date.now();let changed=false;
+  a.forEach(x=>{
+    if(!x.on||now-x.last<COOL)return;
+    const s=S.find(v=>v.id===x.stationId),p=priceAt(s,x.fuel,now);
+    if(p<=x.target){
+      const y=priceAt(s,x.fuel,now-864e5),d=p-y;
+      const text=`[제주 주유 알림] ${s.name} ${FUELS[x.fuel]} ${p.toLocaleString()}원/L${s.self?" (셀프)":""} · 어제보다 ${d>0?"+":""}${d}원 · 지도 보기`;
+      x.last=now;x.sent.push(new Date().toLocaleString("ko-KR")+" "+text);x.sent=x.sent.slice(-10);changed=true;notify(text);
+    }
+  });
+  if(changed){save(a);if(!$("alerts").classList.contains("hidden"))renderAlerts()}
+}
+setInterval(checkAlerts,60000);
+
+function showTab(t){
+  $("home").classList.toggle("hidden",t!=="home");$("alerts").classList.toggle("hidden",t!=="alerts");
+  $("tab-home").classList.toggle("on",t==="home");$("tab-alerts").classList.toggle("on",t==="alerts");
+  if(t==="alerts")renderAlerts();else setTimeout(()=>map.invalidateSize(),50);
+}
+$("tab-home").onclick=()=>showTab("home");$("tab-alerts").onclick=()=>showTab("alerts");
+
+refresh(false);checkAlerts();
+</script>
+</body>
+</html>
