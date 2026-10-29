@@ -1,0 +1,15 @@
+{
+  "name": "제주 주유 최저가 도우미",
+  "short_name": "제주주유",
+  "description": "제주 렌터카 반납 전 주유 최저가 추천 + 가격 알림",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b7a75",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
