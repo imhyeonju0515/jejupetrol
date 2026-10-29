@@ -1,1 +1,4 @@
-{ "rewrites": [{ "source": "/", "destination": "/jejupetrol.html" }] }
+{
+  "framework": null,
+  "rewrites": [{ "source": "/", "destination": "/jejupetrol.html" }]
+}
