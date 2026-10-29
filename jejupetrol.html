@@ -5,13 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b7a75">
 <title>제주 주유 최저가 도우미</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--brand:#0b7a75;--soft:#e3f3f2;--bg:#f6f8f8;--card:#fff;--text:#182226;--muted:#667378;--line:#dbe3e4;--danger:#c43d3d}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendard','Noto Sans KR','Malgun Gothic',sans-serif;line-height:1.45}
 .app{max-width:760px;margin:0 auto;padding-bottom:40px}
-header{position:sticky;top:0;z-index:1200;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--brand);color:#fff}
+header{position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--brand);color:#fff}
 header h1{font-size:18px;margin:0}
 header nav button{background:none;border:0;color:#d7efed;font-size:15px;font-weight:600;margin-left:12px;padding:6px 2px;cursor:pointer}
 header nav button.on{color:#fff;border-bottom:2px solid #fff}
@@ -20,7 +19,7 @@ main{padding:0 12px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin:12px 0;display:grid;gap:10px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.row>label{flex:1 1 100px}
 label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
-select,input[type=number]{font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);min-height:42px;width:100%}
+select,input[type=number],input[type=date]{font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);min-height:42px;width:100%}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:14px;min-height:40px;cursor:pointer}
 .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
@@ -28,12 +27,14 @@ select,input[type=number]{font-size:16px;padding:9px 10px;border:1px solid var(-
 .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.danger{color:var(--danger)}
 .check{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--text);font-size:14px}
 .check input[type=checkbox]{width:20px;height:20px}
-.check input[type=number]{width:96px;min-height:36px;padding:4px 8px}
-#map{height:320px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px}
+#map{height:320px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px;position:relative;background:#e9eeee;overflow:hidden}
 #map.pick{outline:3px solid var(--brand);cursor:crosshair}
-.pm{background:#fff;border:2px solid var(--brand);color:var(--brand);border-radius:8px;font-weight:700;font-size:12px;text-align:center;line-height:22px;height:26px;width:58px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.map-msg{padding:24px 16px;text-align:center;color:var(--muted);font-size:14px}
+.pm{background:#fff;border:2px solid var(--brand);color:var(--brand);border-radius:8px;font-weight:700;font-size:12px;text-align:center;line-height:22px;height:26px;width:58px;box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
 .pm.best{background:var(--brand);color:#fff}.pm.sel{border-color:#e8590c;transform:scale(1.15)}
-.pin{font-size:24px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pin{font-size:24px;text-shadow:0 1px 3px rgba(0,0,0,.4);pointer-events:none}
+.banner{border-radius:10px;padding:8px 12px;margin:8px 0;font-size:13px}
+.banner.live{background:var(--soft);color:#07514d}.banner.sample{background:#fff4dd;color:#8a5a00}
 .explain{background:var(--soft);border-radius:10px;padding:10px 12px;margin:8px 0}
 ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
 .st{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}.st.open{border-color:var(--brand)}
@@ -83,7 +84,8 @@ ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
     <label class="check"><input type="checkbox" id="selfonly"> 셀프 주유소만</label>
     <p class="small error" id="geo-err"></p>
   </div>
-  <div id="map"></div>
+  <div id="map"><div class="map-msg">지도를 불러오는 중…</div></div>
+  <div id="banner"></div>
   <div id="notices"></div>
   <div id="explain"></div>
   <ol id="list"></ol>
@@ -98,17 +100,14 @@ ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
 </section>
 </main>
 </div>
-
 <div class="back hidden" id="modal-back"><div class="modal" id="modal"></div></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 "use strict";
-/* ============ 데이터 (샘플: 실제 주유소/가격이 아닙니다) ============ */
+/* ============ 상수 / 샘플 데이터 (실시간 조회 실패 시 대체용) ============ */
 const FUELS={B027:"휘발유",D047:"경유",B034:"고급휘발유",K015:"LPG"};
 const BASE={B027:1650,D047:1490,B034:1890,K015:1010};
 const ZONES=[["제주공항",33.5113,126.493],["제주시",33.4996,126.5312],["서귀포",33.2541,126.5601],["성산",33.458,126.9425],["애월",33.4636,126.3311]];
-// id,상호,브랜드,주소,lat,lng,셀프,알뜰,오프셋,위상
 const S=[
 ["M01","공항로셀프주유소","자영알뜰","제주시 공항로 2",33.5072,126.4985,1,1,-35,0],
 ["M02","용담주유소","SK에너지","제주시 용담이동 1500",33.512,126.509,0,0,25,.8],
@@ -131,27 +130,62 @@ const S=[
 ["M19","표선셀프주유소","S-OIL","서귀포시 표선면 표선리 20",33.326,126.835,1,0,-5,1.4],
 ["M20","조천주유소","SK에너지","제주시 조천읍 신북로 700",33.54,126.64,0,0,20,2.4]
 ].map(a=>({id:a[0],name:a[1],brand:a[2],addr:a[3],lat:a[4],lng:a[5],self:!!a[6],alt:!!a[7],off:a[8],ph:a[9]}));
-
 function priceAt(s,fuel,ms){
   const b=Math.floor(ms/600000);
   return Math.round(BASE[fuel]+s.off+Math.sin(b/36*2*Math.PI+s.ph)*25+Math.sin(b/600*2*Math.PI+s.ph)*15);
 }
-function history(s,fuel,days){const out=[],now=Date.now();for(let t=now-days*864e5;t<=now;t+=3*36e5)out.push([t,priceAt(s,fuel,t)]);return out}
+const sampleList=fuel=>S.map(s=>({id:s.id,name:s.name,brand:s.brand,addr:s.addr,lat:s.lat,lng:s.lng,self:s.self,alt:s.alt,price:priceAt(s,fuel,Date.now()),updated:""}));
 
-/* ============ 계산 ============ */
+/* ============ 실시간 가격 (/api/stations → 오피넷) ============ */
+const $=id=>document.getElementById(id);
 const km=(a,b)=>{const r=6371.0088,q=Math.PI/180,dl=(b[0]-a[0])*q,dg=(b[1]-a[1])*q;
   const h=Math.sin(dl/2)**2+Math.cos(a[0]*q)*Math.cos(b[0]*q)*Math.sin(dg/2)**2;return 2*r*Math.asin(Math.sqrt(h))};
-// 직선거리 x1.35 도로계수, 평균 40km/h (서버 없는 버전이라 길찾기 API 대신 추정)
-const travel=(a,b)=>{const d=km(a,b)*1.35;return{min:d/40*60,km:d}};
+const cache=new Map();
+async function loadStations(lat,lng,radiusKm,fuel){
+  const key=[lat.toFixed(3),lng.toFixed(3),radiusKm,fuel].join();
+  const hit=cache.get(key);
+  if(hit&&Date.now()-hit.t<300000)return hit;
+  let data;
+  try{
+    const r=await fetch(`/api/stations?lat=${lat}&lng=${lng}&radius=${radiusKm*1000}&fuel=${fuel}`);
+    if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||("HTTP "+r.status));
+    const j=await r.json();
+    data={live:true,list:j.stations,t:Date.now()};
+    recordHistory(j.stations,fuel);
+  }catch(e){
+    data={live:false,list:sampleList(fuel),err:String(e.message||e),t:Date.now()};
+  }
+  cache.set(key,data);return data;
+}
+// 실시간 모드의 가격 추이: 이 브라우저에서 조회할 때마다 쌓는다 (7일)
+const HK="jp-hist-v1";
+const hload=()=>{try{return JSON.parse(localStorage.getItem(HK))||{}}catch{return{}}};
+function recordHistory(list,fuel){
+  const h=hload(),now=Date.now();
+  list.forEach(s=>{const k=s.id+"|"+fuel,a=(h[k]||[]).filter(p=>now-p[0]<7*864e5),l=a[a.length-1];
+    if(!l||l[1]!==s.price||now-l[0]>36e5)a.push([now,s.price]);h[k]=a});
+  try{localStorage.setItem(HK,JSON.stringify(h))}catch{}
+}
+function historyOf(s,fuel,live){
+  if(!live){const out=[],now=Date.now(),x=S.find(v=>v.id===s.id);for(let t=now-7*864e5;t<=now;t+=3*36e5)out.push([t,priceAt(x,fuel,t)]);return out}
+  return (hload()[s.id+"|"+fuel]||[]);
+}
+function yesterdayPrice(s,fuel,live){
+  if(!live){const x=S.find(v=>v.id===s.id);return x?priceAt(x,fuel,Date.now()-864e5):null}
+  const a=hload()[s.id+"|"+fuel]||[],cut=Date.now()-20*36e5,old=a.filter(p=>p[0]<=cut);
+  return old.length?old[old.length-1][1]:null;
+}
+
+/* ============ 계산 ============ */
+const travel=(a,b)=>{const d=km(a,b)*1.35;return{min:d/40*60,km:d}}; // 직선거리×1.35, 평균 40km/h 추정
 const won=n=>Math.round(n).toLocaleString("ko-KR")+"원";
 function totalCost(price,L,xMin,xKm,tv,eff=10){
   const fuel=Math.round(price*L),time=Math.round(xMin/60*tv),trav=Math.round(xKm/eff*price);
   return{fuel,time,trav,total:fuel+time+trav};
 }
-function recommend(o){
-  const {origin,dest,fuel,radiusKm,L,tv,near,selfOnly}=o,now=Date.now(),notices=[];
-  let list=S.map(s=>({...s,price:priceAt(s,fuel,now),dist:km(origin,[s.lat,s.lng])}))
-    .filter(s=>s.dist<=radiusKm&&(!selfOnly||s.self));
+function recommend(o,stations){
+  const {origin,dest,radiusKm,L,tv,near,selfOnly}=o,notices=[];
+  let list=stations.map(s=>({...s,dist:km(origin,[s.lat,s.lng])})).filter(s=>s.dist<=radiusKm+.05&&(!selfOnly||s.self));
   const found=list.length;
   if(dest&&near){const n=list.filter(s=>km(dest,[s.lat,s.lng])<=3);
     if(n.length)list=n;else if(list.length)notices.push("반납 장소 3km 이내 주유소가 없어 전체 주유소에서 추천합니다.")}
@@ -172,48 +206,83 @@ function recommend(o){
   return{top:rows.slice(0,5),all:rows,explain,notices,found};
 }
 
-/* ============ 상태 / UI ============ */
-const $=id=>document.getElementById(id);
-const st={center:{lat:ZONES[0][1],lng:ZONES[0][2],label:ZONES[0][0]},dest:null,pick:null,sel:null,res:null};
-const RADII=[1,3,5,10];
+/* ============ 카카오 지도 ============ */
+const RADII=[1,3,5,10],LEVEL={1:5,3:7,5:8,10:9};
+const st={center:{lat:ZONES[0][1],lng:ZONES[0][2],label:ZONES[0][0]},dest:null,pick:null,sel:null,data:null,res:null};
+let map=null,circle=null,overlays=[],cfg={};
+const mapMsg=t=>{$("map").innerHTML=`<div class="map-msg">${t}</div>`};
+async function initMap(){
+  try{cfg=await (await fetch("/api/config")).json()}catch{cfg={}}
+  if(!cfg.kakaoJsKey){mapMsg("지도를 표시하려면 Vercel 환경변수 <b>KAKAO_JS_KEY</b>(카카오 JavaScript 키)를 설정해 주세요.<br>지도 없이도 아래 목록은 사용할 수 있습니다.");return}
+  try{
+    await new Promise((ok,fail)=>{
+      const s=document.createElement("script");
+      s.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(cfg.kakaoJsKey)}&autoload=false`;
+      s.onload=()=>kakao.maps.load(ok);s.onerror=fail;document.head.appendChild(s);
+    });
+    $("map").innerHTML="";
+    map=new kakao.maps.Map($("map"),{center:new kakao.maps.LatLng(st.center.lat,st.center.lng),level:LEVEL[3]});
+    kakao.maps.event.addListener(map,"click",e=>{
+      if(!st.pick)return;
+      const p={lat:+e.latLng.getLat().toFixed(5),lng:+e.latLng.getLng().toFixed(5),label:"지도에서 선택"};
+      if(st.pick==="dest"){st.dest=p;$("dest").value=""}else st.center=p;
+      setPick(null);refresh(true);
+    });
+    refresh(true);
+  }catch{
+    mapMsg("카카오 지도를 불러오지 못했습니다. 카카오 개발자 콘솔 → 앱 → 플랫폼 → Web 에 이 사이트 주소를 등록했는지, JavaScript 키가 맞는지 확인해 주세요.");
+  }
+}
+function overlay(lat,lng,el,z,y){
+  const o=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(lat,lng),content:el,yAnchor:y,zIndex:z,xAnchor:.5});
+  o.setMap(map);overlays.push(o);return o;
+}
+function drawMap(fly,bestId){
+  if(!map)return;
+  overlays.forEach(o=>o.setMap(null));overlays=[];if(circle)circle.setMap(null);
+  const r=+$("radius").value;
+  circle=new kakao.maps.Circle({center:new kakao.maps.LatLng(st.center.lat,st.center.lng),radius:r*1000,strokeWeight:1,strokeColor:"#0b7a75",strokeOpacity:.8,fillColor:"#0b7a75",fillOpacity:.06});
+  circle.setMap(map);
+  const pin=e=>{const d=document.createElement("div");d.className="pin";d.textContent=e;return d};
+  overlay(st.center.lat,st.center.lng,pin("📍"),1,1);
+  if(st.dest)overlay(st.dest.lat,st.dest.lng,pin("🏁"),1,1);
+  st.res.all.forEach(s=>{
+    const d=document.createElement("div");
+    d.className="pm"+(s.id===bestId?" best":"")+(s.id===st.sel?" sel":"");
+    d.textContent=s.price.toLocaleString();
+    d.addEventListener("click",()=>{st.sel=s.id;refresh()});
+    overlay(s.lat,s.lng,d,s.id===st.sel?30:s.id===bestId?20:10,1);
+  });
+  if(fly){map.setLevel(LEVEL[r]||7);map.panTo(new kakao.maps.LatLng(st.center.lat,st.center.lng))}
+}
+function setPick(m){st.pick=m;$("map").classList.toggle("pick",!!m);
+  $("btn-pick").classList.toggle("on",m==="center");$("btn-pickdest").classList.toggle("on",m==="dest")}
+
+/* ============ 화면 ============ */
 $("fuel").innerHTML=Object.entries(FUELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
 $("radius").innerHTML=RADII.map(r=>`<option value="${r}" ${r===3?"selected":""}>${r}km</option>`).join("");
 $("dest").innerHTML='<option value="">지정 안 함</option>'+ZONES.map((z,i)=>`<option value="${i}">${z[0]}</option>`).join("");
 $("zones").innerHTML=ZONES.map((z,i)=>`<button class="chip" data-z="${i}">${z[0]}</button>`).join("");
 
-const map=L.map("map").setView([st.center.lat,st.center.lng],12);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
-const layer=L.layerGroup().addTo(map);
-let circle=null;
-const pinIcon=e=>L.divIcon({className:"",html:`<div class="pin">${e}</div>`,iconSize:[30,30],iconAnchor:[15,28]});
-map.on("click",e=>{
-  if(!st.pick)return;
-  const p={lat:+e.latlng.lat.toFixed(5),lng:+e.latlng.lng.toFixed(5),label:"지도에서 선택"};
-  if(st.pick==="dest"){st.dest=p;$("dest").value=""}else st.center=p;
-  setPick(null);refresh(true);
-});
-function setPick(m){st.pick=m;$("map").classList.toggle("pick",!!m);
-  $("btn-pick").classList.toggle("on",m==="center");$("btn-pickdest").classList.toggle("on",m==="dest")}
-
 function inputs(){return{origin:[st.center.lat,st.center.lng],dest:st.dest?[st.dest.lat,st.dest.lng]:null,
   fuel:$("fuel").value,radiusKm:+$("radius").value,L:Math.max(1,+$("liters").value||30),tv:Math.max(0,+$("tv").value||0),
   near:$("near").checked,selfOnly:$("selfonly").checked}}
 
-function refresh(fly){
-  const o=inputs();st.res=recommend(o);const r=st.res;
+let seq=0;
+async function refresh(fly){
+  const my=++seq,o=inputs();
+  $("list").style.opacity=.5;
+  const data=await loadStations(st.center.lat,st.center.lng,o.radiusKm,o.fuel);
+  if(my!==seq)return; // 더 최신 요청이 있으면 무시
+  $("list").style.opacity=1;
+  st.data=data;const r=st.res=recommend(o,data.list);
   $("near-wrap").classList.toggle("hidden",!st.dest);
   document.querySelectorAll("#zones .chip").forEach(b=>b.classList.toggle("on",ZONES[b.dataset.z][0]===st.center.label));
-  layer.clearLayers();if(circle)map.removeLayer(circle);
-  circle=L.circle([st.center.lat,st.center.lng],{radius:o.radiusKm*1000,color:"#0b7a75",weight:1,fillOpacity:.05}).addTo(map);
-  L.marker([st.center.lat,st.center.lng],{icon:pinIcon("📍"),interactive:false}).addTo(layer);
-  if(st.dest)L.marker([st.dest.lat,st.dest.lng],{icon:pinIcon("🏁"),interactive:false}).addTo(layer);
+  $("banner").innerHTML=data.live
+    ?'<div class="banner live">✅ 한국석유공사 오피넷 실시간 가격 (최대 5분 지연)</div>'
+    :`<div class="banner sample">⚠️ 실시간 가격을 가져오지 못해 <b>샘플 데이터</b>를 표시 중입니다. (${data.err||"알 수 없는 오류"})</div>`;
   const bestId=r.top[0]&&r.top[0].id;
-  r.all.forEach(s=>{
-    const cls="pm"+(s.id===bestId?" best":"")+(s.id===st.sel?" sel":"");
-    L.marker([s.lat,s.lng],{icon:L.divIcon({className:"",html:`<div class="${cls}">${s.price.toLocaleString()}</div>`,iconSize:[58,26],iconAnchor:[29,26]}),
-      zIndexOffset:s.id===st.sel?1000:s.id===bestId?500:0}).on("click",()=>{st.sel=s.id;refresh()}).addTo(layer);
-  });
-  if(fly)map.flyTo([st.center.lat,st.center.lng],map.getZoom(),{duration:.6});
+  drawMap(fly,bestId);
   $("notices").innerHTML=r.notices.map(n=>`<p class="small" style="color:#b7791f">ℹ️ ${n}</p>`).join("")
     +(r.found?"":'<p class="muted">반경 내 주유소가 없습니다. 반경을 넓혀 보세요.</p>');
   $("explain").innerHTML=r.explain?`<div class="explain">💡 ${r.explain}</div>`:"";
@@ -221,25 +290,27 @@ function refresh(fly){
     const open=s.id===st.sel;
     return `<li class="st ${open?"open":""}"><div class="st-main" data-id="${s.id}">
       <span class="rank">${s.rank}</span>
-      <span class="info"><strong>${s.name}</strong><span>${s.self?'<span class="badge b-self">셀프</span>':""}${s.alt?'<span class="badge b-alt">알뜰</span>':""}<span class="muted small">${s.brand}${s.pr!==s.rank?` · 가격순 ${s.pr}위`:""}</span></span></span>
+      <span class="info"><strong>${s.name}</strong><span>${s.self?'<span class="badge b-self">셀프</span>':""}${s.alt?'<span class="badge b-alt">알뜰</span>':""}<span class="muted small">${s.brand||""}${s.pr!==s.rank?` · 가격순 ${s.pr}위`:""}</span></span></span>
       <span class="nums"><span class="price">${s.price.toLocaleString()}<small>원/L</small></span>
       <span class="muted small">${st.dest?"우회":"왕복"} ${Math.round(s.xm)}분(추정)</span><span class="total">총 ${won(s.c.total)}</span></span></div>
-      ${open?`<div class="detail"><p class="small">${s.addr}</p>
+      ${open?`<div class="detail"><p class="small">${s.addr||"주소 정보 없음"}${s.updated?` · 가격 갱신 ${s.updated}`:""}</p>
       <p class="small muted">주유 ${won(s.c.fuel)} + 시간 ${won(s.c.time)} + 이동연료 ${won(s.c.trav)}</p>
-      ${chart(s,o.fuel)}<button class="btn primary" data-alert="${s.id}" style="width:100%">🔔 이 가격에 알림</button></div>`:""}</li>`}).join("");
-  $("foot").textContent=`반경 내 ${r.found}곳 · 샘플 데이터(실제 가격 아님) · 이동 시간은 직선거리 기반 추정`;
+      ${chart(s,o.fuel,data.live)}<button class="btn primary" data-alert="${s.id}" style="width:100%">🔔 이 가격에 알림</button></div>`:""}</li>`}).join("");
+  $("foot").textContent=`반경 내 ${r.found}곳 · 이동 시간은 직선거리 기반 추정`;
 }
-function chart(s,fuel){
-  const h=history(s,fuel,7),W=300,H=80,p=6,t0=h[0][0],t1=h[h.length-1][0],ps=h.map(x=>x[1]),lo=Math.min(...ps),hi=Math.max(...ps);
-  const X=t=>p+(t-t0)/(t1-t0)*(W-2*p),Y=v=>H-p-(v-lo)/Math.max(hi-lo,1)*(H-2*p);
+function chart(s,fuel,live){
+  const h=historyOf(s,fuel,live);
+  if(h.length<2)return '<p class="small muted">가격 추이는 이 브라우저에서 조회할 때마다 쌓입니다. (아직 이력이 부족)</p>';
+  const W=300,H=80,p=6,t0=h[0][0],t1=h[h.length-1][0],ps=h.map(x=>x[1]),lo=Math.min(...ps),hi=Math.max(...ps);
+  const X=t=>p+(t-t0)/Math.max(t1-t0,1)*(W-2*p),Y=v=>H-p-(v-lo)/Math.max(hi-lo,1)*(H-2*p);
   const d=h.map((x,i)=>`${i?"L":"M"}${X(x[0]).toFixed(1)},${Y(x[1]).toFixed(1)}`).join(" ");
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 7일 가격 추이"><path d="${d}" fill="none" stroke="#0b7a75" stroke-width="2"/><circle cx="${X(t1)}" cy="${Y(ps[ps.length-1])}" r="3.5" fill="#0b7a75"/></svg>
-  <div class="legend small muted"><span>7일 최저 ${lo.toLocaleString()}원</span><span>현재 ${ps[ps.length-1].toLocaleString()}원</span><span>최고 ${hi.toLocaleString()}원</span></div></div>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="가격 추이"><path d="${d}" fill="none" stroke="#0b7a75" stroke-width="2"/><circle cx="${X(t1)}" cy="${Y(ps[ps.length-1])}" r="3.5" fill="#0b7a75"/></svg>
+  <div class="legend small muted"><span>최저 ${lo.toLocaleString()}원</span><span>현재 ${ps[ps.length-1].toLocaleString()}원</span><span>최고 ${hi.toLocaleString()}원</span></div></div>`;
 }
 
 $("zones").onclick=e=>{const i=e.target.dataset.z;if(i==null)return;const z=ZONES[i];st.center={lat:z[1],lng:z[2],label:z[0]};refresh(true)};
 $("dest").onchange=e=>{const v=e.target.value;st.dest=v===""?null:{lat:ZONES[v][1],lng:ZONES[v][2],label:ZONES[v][0]};refresh()};
-["fuel","radius","liters","tv","near","selfonly"].forEach(id=>$(id).addEventListener("change",()=>refresh()));
+["fuel","radius","liters","tv","near","selfonly"].forEach(id=>$(id).addEventListener("change",()=>refresh(id==="radius")));
 $("btn-pick").onclick=()=>setPick(st.pick==="center"?null:"center");
 $("btn-pickdest").onclick=()=>setPick(st.pick==="dest"?null:"dest");
 $("btn-geo").onclick=()=>{
@@ -258,18 +329,19 @@ $("list").onclick=e=>{
 };
 
 /* ============ 알림 (localStorage, 페이지가 열려 있을 때만 동작) ============ */
-const KEY="jejupetrol-alerts-v1";
+const KEY="jejupetrol-alerts-v2";
 const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch{return[]}};
 const save=a=>{try{localStorage.setItem(KEY,JSON.stringify(a))}catch{}};
 const COOL=6*36e5;
 
 function openAlertModal(stationId){
-  const s=S.find(x=>x.id===stationId),o=inputs(),cur=priceAt(s,o.fuel,Date.now());
+  const s=st.res.all.find(x=>x.id===stationId),o=inputs();
+  if(!s)return;
   $("modal").innerHTML=`<h2>🔔 ${s.name}</h2>
-  <p class="small muted">현재 ${cur.toLocaleString()}원/L · 목표가 이하가 되면 알려드려요. (이 주유소 기준)</p>
-  <label>목표가 (원/L 이하)<input id="m-price" type="number" value="${cur-20}"></label>
+  <p class="small muted">현재 ${s.price.toLocaleString()}원/L · 목표가 이하가 되면 알려드려요. (이 주유소 기준)</p>
+  <label>목표가 (원/L 이하)<input id="m-price" type="number" value="${s.price-20}"></label>
   <p class="small muted">제안: 현재가보다 -20원</p>
-  <label>대여 종료일 (선택 · 지나면 자동 삭제)<input id="m-end" type="date" style="font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px"></label>
+  <label>대여 종료일 (선택 · 지나면 자동 삭제)<input id="m-end" type="date"></label>
   <p class="small muted">푸시 서버가 없어, 페이지가 열려 있을 때 브라우저 알림(권한 허용 시)과 화면 안내로 알려드립니다. 아래 버튼을 누를 때 알림 권한을 요청합니다.</p>
   <p id="m-err" class="small error"></p>
   <div class="actions"><button class="btn" id="m-cancel">취소</button><button class="btn primary" id="m-ok">🔔 알림 등록</button></div>`;
@@ -278,14 +350,14 @@ function openAlertModal(stationId){
   $("m-ok").onclick=async()=>{
     const price=+$("m-price").value;
     if(!(price>0)){$("m-err").textContent="목표가(원/L)를 입력해 주세요.";return}
-    const end=$("m-end").value||null;
     let msg="";
     if("Notification" in window){
       if(Notification.permission==="denied")msg="브라우저 알림이 차단되어 화면 안내로만 알려드립니다. (설정에서 허용 가능)";
       else if(Notification.permission==="default"){const p=await Notification.requestPermission();if(p!=="granted")msg="알림 권한이 허용되지 않아 화면 안내로만 알려드립니다."}
     }else msg="이 브라우저는 알림을 지원하지 않아 화면 안내로만 알려드립니다.";
     const a=load();
-    a.push({id:Date.now(),stationId:s.id,name:s.name,fuel:o.fuel,target:price,end,on:true,last:0,sent:[]});
+    a.push({id:Date.now(),stationId:s.id,name:s.name,fuel:o.fuel,target:price,end:$("m-end").value||null,
+      lat:st.center.lat,lng:st.center.lng,radiusKm:o.radiusKm,on:true,last:0,sent:[]});
     save(a);closeModal();showTab("alerts");
     $("alert-msg").textContent=msg||"알림이 등록되었습니다.";
   };
@@ -299,12 +371,11 @@ function pruneExpired(){
 }
 function renderAlerts(){
   pruneExpired();const a=load();
-  $("alert-list").innerHTML=a.length?a.map(x=>{const s=S.find(v=>v.id===x.stationId),cur=priceAt(s,x.fuel,Date.now());
-    return `<div class="card ${x.on?"":"off"}"><strong>${x.name} · ${FUELS[x.fuel]}</strong>
-    <p class="small">목표가 ${x.target.toLocaleString()}원/L 이하 · 현재 ${cur.toLocaleString()}원</p>
+  $("alert-list").innerHTML=a.length?a.map(x=>`<div class="card ${x.on?"":"off"}"><strong>${x.name} · ${FUELS[x.fuel]}</strong>
+    <p class="small">목표가 ${x.target.toLocaleString()}원/L 이하</p>
     ${x.end?`<p class="small muted">대여 종료일 ${x.end} (이후 자동 삭제)</p>`:""}
     ${x.sent.length?`<p class="small muted">최근 알림: ${x.sent.slice(-3).reverse().join("<br>")}</p>`:""}
-    <div class="actions"><button class="btn" data-t="${x.id}">${x.on?"끄기":"켜기"}</button><button class="btn" data-test="${x.id}">테스트</button><button class="btn danger" data-d="${x.id}">삭제</button></div></div>`}).join("")
+    <div class="actions"><button class="btn" data-t="${x.id}">${x.on?"끄기":"켜기"}</button><button class="btn" data-test="${x.id}">테스트</button><button class="btn danger" data-d="${x.id}">삭제</button></div></div>`).join("")
     :'<p class="muted">등록된 알림이 없습니다. 주유소를 눌러 “🔔 이 가격에 알림”을 사용해 보세요.</p>';
 }
 function notify(text){
@@ -319,29 +390,32 @@ $("alert-list").onclick=e=>{
   else return;
   save(a);renderAlerts();
 };
-function checkAlerts(){
-  pruneExpired();const a=load(),now=Date.now();let changed=false;
-  a.forEach(x=>{
-    if(!x.on||now-x.last<COOL)return;
-    const s=S.find(v=>v.id===x.stationId),p=priceAt(s,x.fuel,now);
-    if(p<=x.target){
-      const y=priceAt(s,x.fuel,now-864e5),d=p-y;
-      const text=`[제주 주유 알림] ${s.name} ${FUELS[x.fuel]} ${p.toLocaleString()}원/L${s.self?" (셀프)":""} · 어제보다 ${d>0?"+":""}${d}원 · 지도 보기`;
+let checking=false;
+async function checkAlerts(){
+  if(checking)return;checking=true;
+  try{
+    pruneExpired();const a=load(),now=Date.now();let changed=false;
+    for(const x of a){
+      if(!x.on||now-x.last<COOL)continue;
+      const d=await loadStations(x.lat,x.lng,x.radiusKm||3,x.fuel),s=d.list.find(v=>v.id===x.stationId);
+      if(!s||s.price>x.target)continue;
+      const y=yesterdayPrice(s,x.fuel,d.live),delta=y==null?"":` · 어제보다 ${s.price-y>0?"+":""}${s.price-y}원`;
+      const text=`[제주 주유 알림] ${s.name} ${FUELS[x.fuel]} ${s.price.toLocaleString()}원/L${s.self?" (셀프)":""}${delta}${d.live?"":" · 샘플 데이터"}`;
       x.last=now;x.sent.push(new Date().toLocaleString("ko-KR")+" "+text);x.sent=x.sent.slice(-10);changed=true;notify(text);
     }
-  });
-  if(changed){save(a);if(!$("alerts").classList.contains("hidden"))renderAlerts()}
+    if(changed){save(a);if(!$("alerts").classList.contains("hidden"))renderAlerts()}
+  }finally{checking=false}
 }
 setInterval(checkAlerts,60000);
 
 function showTab(t){
   $("home").classList.toggle("hidden",t!=="home");$("alerts").classList.toggle("hidden",t!=="alerts");
   $("tab-home").classList.toggle("on",t==="home");$("tab-alerts").classList.toggle("on",t==="alerts");
-  if(t==="alerts")renderAlerts();else setTimeout(()=>map.invalidateSize(),50);
+  if(t==="alerts")renderAlerts();else if(map)setTimeout(()=>{map.relayout();map.setCenter(new kakao.maps.LatLng(st.center.lat,st.center.lng))},50);
 }
 $("tab-home").onclick=()=>showTab("home");$("tab-alerts").onclick=()=>showTab("alerts");
 
-refresh(false);checkAlerts();
+refresh(false);initMap();checkAlerts();
 </script>
 </body>
 </html>
